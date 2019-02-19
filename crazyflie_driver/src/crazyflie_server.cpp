@@ -22,14 +22,16 @@
 #include "crazyflie_driver/crtpPacket.h"
 #include "crazyflie_cpp/Crazyradio.h"
 #include "crazyflie_cpp/crtp.h"
-#include "std_srvs/Empty.h"
+#include <std_srvs/Empty.h>
 #include <std_msgs/Empty.h>
-#include "geometry_msgs/Twist.h"
-#include "geometry_msgs/PointStamped.h"
-#include "sensor_msgs/Imu.h"
-#include "sensor_msgs/Temperature.h"
-#include "sensor_msgs/MagneticField.h"
-#include "std_msgs/Float32.h"
+#include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/Temperature.h>
+#include <sensor_msgs/MagneticField.h>
+#include <std_msgs/Float32.h>
 
 //#include <regex>
 #include <thread>
@@ -131,6 +133,8 @@ public:
     , m_subscribeCmdPosition()
     , m_subscribeExternalPosition()
     , m_pubImu()
+    , m_pubPose()
+    , m_pubPoseCov()
     , m_pubTemp()
     , m_pubMag()
     , m_pubPressure()
@@ -140,6 +144,21 @@ public:
     , m_sentExternalPosition(false)
   {
     m_thread = std::thread(&CrazyflieROS::run, this);
+    imu_msg.header.stamp = ros::Time::now();
+    imu_msg.header.frame_id = name;
+    posestamped_msg.header.stamp = ros::Time::now();
+    posestamped_msg.header.frame_id = name;
+    posecovariance_msg.header.stamp = ros::Time::now();
+    posecovariance_msg.header.frame_id = name;
+    magneticfield_msg.header.stamp = ros::Time::now();
+    magneticfield_msg.header.frame_id = name;
+
+    posecovariance_msg.pose.covariance[0] = 15.0;
+    posecovariance_msg.pose.covariance[7] = 15.0;
+    posecovariance_msg.pose.covariance[14] = 15.0;
+    posecovariance_msg.pose.covariance[21] = 2.0;
+    posecovariance_msg.pose.covariance[28] = 2.0;
+    posecovariance_msg.pose.covariance[35] = 2.0;
   }
 
   void stop()
@@ -172,6 +191,9 @@ public:
 
 private:
   sensor_msgs::Imu imu_msg;
+  geometry_msgs::PoseStamped posestamped_msg;
+  geometry_msgs::PoseWithCovarianceStamped posecovariance_msg;
+  sensor_msgs::MagneticField magneticfield_msg;
 
   struct logImu {
     float acc_x;
@@ -182,7 +204,7 @@ private:
     float gyro_z;
   } __attribute__((packed));
 
-  struct log2 {
+  struct logExtraSensors {
     float mag_x;
     float mag_y;
     float mag_z;
@@ -195,7 +217,9 @@ private:
     float q0;
     float q1;
     float q2;
-    float q3;
+    float var_q0;
+    float var_q1;
+    float var_q2;
   } __attribute__((packed));
 
   struct logKalman {
@@ -388,6 +412,10 @@ void cmdPositionSetpoint(
     m_serviceUploadTrajectory = n.advertiseService(name + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
     m_serviceStartTrajectory = n.advertiseService(name + "/start_trajectory", &CrazyflieROS::startTrajectory, this);
 
+
+    m_pubPose = n.advertise<geometry_msgs::PoseStamped>(name + "/pose", 10);
+    m_pubPoseCov = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(name + "/pose_cov", 10);
+    
     if (m_enable_logging_imu) {
       m_pubImu = n.advertise<sensor_msgs::Imu>(name + "/imu", 10);
     }
@@ -465,43 +493,10 @@ void cmdPositionSetpoint(
     }
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;
-    std::unique_ptr<LogBlock<log2> > logBlock2;
+    std::unique_ptr<LogBlock<logExtraSensors> > logBlock2;
     std::unique_ptr<LogBlock<logQuaternion> > logBlockQuaternion;
     std::unique_ptr<LogBlock<logKalman> > logBlockKalman;
     std::vector<std::unique_ptr<LogBlockGeneric> > logBlocksGeneric(m_logBlocks.size());
-
-
-    if(m_enable_logging_kalman) {
-      std::function<void(uint32_t, logKalman*)> cb = std::bind(&CrazyflieROS::onKalmanData, this, std::placeholders::_1, std::placeholders::_2);
-
-      logBlockKalman.reset(new LogBlock<logKalman>(
-        &m_cf,{
-          {"kalman", "stateX"},
-          {"kalman", "stateY"},
-          {"kalman", "stateZ"},
-          {"kalman", "varX"},
-          {"kalman", "varY"},
-          {"kalman", "varZ"},
-        }, cb));
-      logBlockKalman->start(1); // 10ms
-    }
-
-    if(m_enable_logging_quaternion) {
-      std::function<void(uint32_t, logQuaternion*)> cb = std::bind(&CrazyflieROS::onQuaternionData, this, std::placeholders::_1, std::placeholders::_2);
-
-      logBlockQuaternion.reset(new LogBlock<logQuaternion>(
-        &m_cf,{
-          {"kalman", "q0"},
-          {"kalman", "q1"},
-          {"kalman", "q2"},
-          {"kalman", "q3"},
-        }, cb));
-      logBlockKalman->start(1); // 10ms
-    }
-
-    if(m_enable_logging_quaternion) {
-
-    }
 
     if (m_enableLogging) {
 
@@ -510,6 +505,40 @@ void cmdPositionSetpoint(
 
       ROS_INFO("Requesting Logging variables...");
       m_cf.requestLogToc();
+
+
+      m_enable_logging_kalman = true;
+      if(m_enable_logging_kalman) {
+        std::function<void(uint32_t, logKalman*)> cb = std::bind(&CrazyflieROS::onKalmanData, this, std::placeholders::_1, std::placeholders::_2);
+
+        logBlockKalman.reset(new LogBlock<logKalman>(
+          &m_cf,{
+            {"kalman", "stateX"},
+            {"kalman", "stateY"},
+            {"kalman", "stateZ"},
+            {"kalman", "varX"},
+            {"kalman", "varY"},
+            {"kalman", "varZ"},
+          }, cb));
+        logBlockKalman->start(1); // 10ms
+      }
+
+      m_enable_logging_quaternion = true;
+      if(m_enable_logging_quaternion) {
+        std::function<void(uint32_t, logQuaternion*)> cb = std::bind(&CrazyflieROS::onQuaternionData, this, std::placeholders::_1, std::placeholders::_2);
+
+        logBlockQuaternion.reset(new LogBlock<logQuaternion>(
+          &m_cf,{
+            {"kalman", "q0"},
+            {"kalman", "q1"},
+            {"kalman", "q2"},
+            {"kalman", "varD0"},
+            {"kalman", "varD1"},
+            {"kalman", "varD2"},
+          }, cb));
+        logBlockQuaternion->start(1); // 10ms
+      }
+
 
       if (m_enable_logging_imu) {
         std::function<void(uint32_t, logImu*)> cb = std::bind(&CrazyflieROS::onImuData, this, std::placeholders::_1, std::placeholders::_2);
@@ -532,9 +561,9 @@ void cmdPositionSetpoint(
           || m_enable_logging_pressure
           || m_enable_logging_battery)
       {
-        std::function<void(uint32_t, log2*)> cb2 = std::bind(&CrazyflieROS::onLog2Data, this, std::placeholders::_1, std::placeholders::_2);
+        std::function<void(uint32_t, logExtraSensors*)> cb2 = std::bind(&CrazyflieROS::onLogExtraSensorsData, this, std::placeholders::_1, std::placeholders::_2);
 
-        logBlock2.reset(new LogBlock<log2>(
+        logBlock2.reset(new LogBlock<logExtraSensors>(
           &m_cf,{
             {"mag", "x"},
             {"mag", "y"},
@@ -630,24 +659,48 @@ void cmdPositionSetpoint(
   }
 
   void onKalmanData(uint32_t time_in_ms, logKalman* data) {
-    // if (m_enable_logging_imu) {
-    //   sensor_msgs::Imu msg;
-    //   if (m_use_ros_time) {
-    //     msg.header.stamp = ros::Time::now();
-    //   } else {
-    //     msg.header.stamp = ros::Time(time_in_ms / 1000.0);
-    //   }
-    //   msg.header.frame_id = "base_link";
-    //   msg.orientation_covariance[0] = -1;
+    posestamped_msg.pose.position.x = data->x;
+    posestamped_msg.pose.position.y = data->y;
+    posestamped_msg.pose.position.z = data->z;
 
-    //   // m_pubImu.publish(msg);
-    // }
+    posecovariance_msg.pose.pose.position.x = data->x;
+    posecovariance_msg.pose.pose.position.y = data->y;
+    posecovariance_msg.pose.pose.position.z = data->z;
+    posecovariance_msg.pose.covariance[0] = data->var_x;
+    posecovariance_msg.pose.covariance[7] = data->var_y;
+    posecovariance_msg.pose.covariance[14] = data->var_z;
+
+    m_pubPose.publish(posestamped_msg);
+    m_pubPoseCov.publish(posecovariance_msg);
   }
 
   void onQuaternionData(uint32_t time_in_ms, logQuaternion* data) {
+    // ROS_WARN_STREAM("Quat(" << data->q0 << ", " << data->q1 << ", " << data->q2 << ", " << data->q3 << ")");
+    double q3 = sqrt(data->q0*data->q0 + data->q1*data->q1 + data->q2*data->q2);
+    imu_msg.header.stamp = ros::Time::now();
+    imu_msg.orientation.x = data->q0;
+    imu_msg.orientation.y = data->q1;
+    imu_msg.orientation.z = data->q2;
+    imu_msg.orientation.w = q3;
+
+    posecovariance_msg.header.stamp = ros::Time::now();
+    posecovariance_msg.pose.pose.orientation.x = data->q0;
+    posecovariance_msg.pose.pose.orientation.y = data->q1;
+    posecovariance_msg.pose.pose.orientation.z = data->q2;
+    posecovariance_msg.pose.pose.orientation.w = q3;
+
+    posecovariance_msg.pose.covariance[21] = data->var_q0;
+    posecovariance_msg.pose.covariance[28] = data->var_q1;
+    posecovariance_msg.pose.covariance[35] = data->var_q2;
+
+    posestamped_msg.header.stamp = ros::Time::now();
+    posestamped_msg.pose.orientation.x = data->q0;
+    posestamped_msg.pose.orientation.y = data->q1;
+    posestamped_msg.pose.orientation.z = data->q2;
+    posestamped_msg.pose.orientation.w = q3;
   }
 
-  void onLog2Data(uint32_t time_in_ms, log2* data) {
+  void onLogExtraSensorsData(uint32_t time_in_ms, logExtraSensors* data) {
 
     if (m_enable_logging_temperature) {
       sensor_msgs::Temperature msg;
@@ -672,9 +725,14 @@ void cmdPositionSetpoint(
       msg.header.frame_id = "base_link";
 
       // measured in Tesla
+      // TODO: Remove msg.
       msg.magnetic_field.x = data->mag_x;
       msg.magnetic_field.y = data->mag_y;
       msg.magnetic_field.z = data->mag_z;
+
+      magneticfield_msg.magnetic_field.x = data->mag_x;
+      magneticfield_msg.magnetic_field.y = data->mag_y;
+      magneticfield_msg.magnetic_field.z = data->mag_z;
       m_pubMag.publish(msg);
     }
 
@@ -717,8 +775,8 @@ void cmdPositionSetpoint(
   }
 
   void onLinkQuality(float linkQuality) {
-      if (linkQuality < 0.7) {
-        ROS_WARN("Link Quality low (%f)", linkQuality);
+      if (linkQuality < 0.4) {
+        ROS_WARN_THROTTLE(5, "Link Quality low (%f)", linkQuality);
       }
   }
 
@@ -856,6 +914,8 @@ private:
   ros::Subscriber m_subscribeCmdPosition;
   ros::Subscriber m_subscribeExternalPosition;
   ros::Publisher m_pubImu;
+  ros::Publisher m_pubPose;
+  ros::Publisher m_pubPoseCov;
   ros::Publisher m_pubTemp;
   ros::Publisher m_pubMag;
   ros::Publisher m_pubPressure;
