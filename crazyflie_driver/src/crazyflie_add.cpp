@@ -9,7 +9,7 @@ int main(int argc, char **argv)
 
   // read paramaters
   std::string uri;
-  std::string tf_prefix;
+  std::string name;
   double roll_trim;
   double pitch_trim;
   bool enable_logging;
@@ -23,7 +23,7 @@ int main(int argc, char **argv)
   bool enable_logging_packets;
 
   n.getParam("uri", uri);
-  n.getParam("tf_prefix", tf_prefix);
+  n.getParam("name", name);
   n.param("roll_trim", roll_trim, 0.0);
   n.param("pitch_trim", pitch_trim, 0.0);
   n.param("enable_logging", enable_logging, true);
@@ -43,7 +43,7 @@ int main(int argc, char **argv)
   ROS_INFO("found /add_crazyflie");
   crazyflie_driver::AddCrazyflie addCrazyflie;
   addCrazyflie.request.uri = uri;
-  addCrazyflie.request.tf_prefix = tf_prefix;
+  addCrazyflie.request.name = name;
   addCrazyflie.request.roll_trim = roll_trim;
   addCrazyflie.request.pitch_trim = pitch_trim;
   addCrazyflie.request.enable_logging = enable_logging;

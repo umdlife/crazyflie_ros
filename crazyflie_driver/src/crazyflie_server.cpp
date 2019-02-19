@@ -83,7 +83,7 @@ class CrazyflieROS
 public:
   CrazyflieROS(
     const std::string& link_uri,
-    const std::string& tf_prefix,
+    const std::string& name,
     float roll_trim,
     float pitch_trim,
     bool enable_logging,
@@ -97,7 +97,7 @@ public:
     bool enable_logging_battery,
     bool enable_logging_packets)
     : m_cf(link_uri, rosLogger)
-    , m_tf_prefix(tf_prefix)
+    , name(name)
     , m_isEmergency(false)
     , m_roll_trim(roll_trim)
     , m_pitch_trim(pitch_trim)
@@ -250,7 +250,7 @@ void cmdPositionSetpoint(
   {
     ROS_INFO("Update parameters");
     for (auto&& p : req.params) {
-      std::string ros_param = "/" + m_tf_prefix + "/" + p;
+      std::string ros_param = "/" + name + "/" + p;
       size_t pos = p.find("/");
       std::string group(p.begin(), p.begin() + pos);
       std::string name(p.begin() + pos + 1, p.end());
@@ -349,49 +349,49 @@ void cmdPositionSetpoint(
     ros::NodeHandle n;
     n.setCallbackQueue(&m_callback_queue);
 
-    m_subscribeCmdVel = n.subscribe(m_tf_prefix + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
-    m_subscribeCmdFullState = n.subscribe(m_tf_prefix + "/cmd_full_state", 1, &CrazyflieROS::cmdFullStateSetpoint, this);
-    m_subscribeExternalPosition = n.subscribe(m_tf_prefix + "/external_position", 1, &CrazyflieROS::positionMeasurementChanged, this);
-    m_serviceEmergency = n.advertiseService(m_tf_prefix + "/emergency", &CrazyflieROS::emergency, this);
-    m_subscribeCmdHover = n.subscribe(m_tf_prefix + "/cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
-    m_subscribeCmdStop = n.subscribe(m_tf_prefix + "/cmd_stop", 1, &CrazyflieROS::cmdStop, this);
-    m_subscribeCmdPosition = n.subscribe(m_tf_prefix + "/cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
+    m_subscribeCmdVel = n.subscribe(name + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
+    m_subscribeCmdFullState = n.subscribe(name + "/cmd_full_state", 1, &CrazyflieROS::cmdFullStateSetpoint, this);
+    m_subscribeExternalPosition = n.subscribe(name + "/external_position", 1, &CrazyflieROS::positionMeasurementChanged, this);
+    m_serviceEmergency = n.advertiseService(name + "/emergency", &CrazyflieROS::emergency, this);
+    m_subscribeCmdHover = n.subscribe(name + "/cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
+    m_subscribeCmdStop = n.subscribe(name + "/cmd_stop", 1, &CrazyflieROS::cmdStop, this);
+    m_subscribeCmdPosition = n.subscribe(name + "/cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
 
 
-    m_serviceSetGroupMask = n.advertiseService(m_tf_prefix + "/set_group_mask", &CrazyflieROS::setGroupMask, this);
-    m_serviceTakeoff = n.advertiseService(m_tf_prefix + "/takeoff", &CrazyflieROS::takeoff, this);
-    m_serviceLand = n.advertiseService(m_tf_prefix + "/land", &CrazyflieROS::land, this);
-    m_serviceStop = n.advertiseService(m_tf_prefix + "/stop", &CrazyflieROS::stop, this);
-    m_serviceGoTo = n.advertiseService(m_tf_prefix + "/go_to", &CrazyflieROS::goTo, this);
-    m_serviceUploadTrajectory = n.advertiseService(m_tf_prefix + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
-    m_serviceStartTrajectory = n.advertiseService(m_tf_prefix + "/start_trajectory", &CrazyflieROS::startTrajectory, this);
+    m_serviceSetGroupMask = n.advertiseService(name + "/set_group_mask", &CrazyflieROS::setGroupMask, this);
+    m_serviceTakeoff = n.advertiseService(name + "/takeoff", &CrazyflieROS::takeoff, this);
+    m_serviceLand = n.advertiseService(name + "/land", &CrazyflieROS::land, this);
+    m_serviceStop = n.advertiseService(name + "/stop", &CrazyflieROS::stop, this);
+    m_serviceGoTo = n.advertiseService(name + "/go_to", &CrazyflieROS::goTo, this);
+    m_serviceUploadTrajectory = n.advertiseService(name + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+    m_serviceStartTrajectory = n.advertiseService(name + "/start_trajectory", &CrazyflieROS::startTrajectory, this);
 
     if (m_enable_logging_imu) {
-      m_pubImu = n.advertise<sensor_msgs::Imu>(m_tf_prefix + "/imu", 10);
+      m_pubImu = n.advertise<sensor_msgs::Imu>(name + "/imu", 10);
     }
     if (m_enable_logging_temperature) {
-      m_pubTemp = n.advertise<sensor_msgs::Temperature>(m_tf_prefix + "/temperature", 10);
+      m_pubTemp = n.advertise<sensor_msgs::Temperature>(name + "/temperature", 10);
     }
     if (m_enable_logging_magnetic_field) {
-      m_pubMag = n.advertise<sensor_msgs::MagneticField>(m_tf_prefix + "/magnetic_field", 10);
+      m_pubMag = n.advertise<sensor_msgs::MagneticField>(name + "/magnetic_field", 10);
     }
     if (m_enable_logging_pressure) {
-      m_pubPressure = n.advertise<std_msgs::Float32>(m_tf_prefix + "/pressure", 10);
+      m_pubPressure = n.advertise<std_msgs::Float32>(name + "/pressure", 10);
     }
     if (m_enable_logging_battery) {
-      m_pubBattery = n.advertise<std_msgs::Float32>(m_tf_prefix + "/battery", 10);
+      m_pubBattery = n.advertise<std_msgs::Float32>(name + "/battery", 10);
     }
     if (m_enable_logging_packets) {
-      m_pubPackets = n.advertise<crazyflie_driver::crtpPacket>(m_tf_prefix + "/packets", 10);
+      m_pubPackets = n.advertise<crazyflie_driver::crtpPacket>(name + "/packets", 10);
     }
-    m_pubRssi = n.advertise<std_msgs::Float32>(m_tf_prefix + "/rssi", 10);
+    m_pubRssi = n.advertise<std_msgs::Float32>(name + "/rssi", 10);
 
     for (auto& logBlock : m_logBlocks)
     {
-      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(m_tf_prefix + "/" + logBlock.topic_name, 10));
+      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(name + "/" + logBlock.topic_name, 10));
     }
 
-    m_sendPacketServer = n.advertiseService(m_tf_prefix + "/send_packet"  , &CrazyflieROS::sendPacket, this);
+    m_sendPacketServer = n.advertiseService(name + "/send_packet"  , &CrazyflieROS::sendPacket, this);
 
     // m_cf.reboot();
 
@@ -414,7 +414,7 @@ void cmdPositionSetpoint(
       m_cf.requestParamToc();
       for (auto iter = m_cf.paramsBegin(); iter != m_cf.paramsEnd(); ++iter) {
         auto entry = *iter;
-        std::string paramName = "/" + m_tf_prefix + "/" + entry.group + "/" + entry.name;
+        std::string paramName = "/" + name + "/" + entry.group + "/" + entry.name;
         switch (entry.type) {
           case Crazyflie::ParamTypeUint8:
             ros::param::set(paramName, m_cf.getParam<uint8_t>(entry.id));
@@ -439,7 +439,7 @@ void cmdPositionSetpoint(
             break;
         }
       }
-      m_serviceUpdateParams = n.advertiseService(m_tf_prefix + "/update_params", &CrazyflieROS::updateParams, this);
+      m_serviceUpdateParams = n.advertiseService(name + "/update_params", &CrazyflieROS::updateParams, this);
     }
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;
@@ -742,7 +742,7 @@ void cmdPositionSetpoint(
 
 private:
   Crazyflie m_cf;
-  std::string m_tf_prefix;
+  std::string name;
   bool m_isEmergency;
   float m_roll_trim;
   float m_pitch_trim;
@@ -830,7 +830,7 @@ private:
   {
     ROS_INFO("Adding %s as %s with trim(%f, %f). Logging: %d, Parameters: %d, Use ROS time: %d",
       req.uri.c_str(),
-      req.tf_prefix.c_str(),
+      req.name.c_str(),
       req.roll_trim,
       req.pitch_trim,
       req.enable_parameters,
@@ -845,7 +845,7 @@ private:
 
     CrazyflieROS* cf = new CrazyflieROS(
       req.uri,
-      req.tf_prefix,
+      req.name,
       req.roll_trim,
       req.pitch_trim,
       req.enable_logging,
