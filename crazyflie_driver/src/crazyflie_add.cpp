@@ -6,6 +6,7 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "crazyflie_add", ros::init_options::AnonymousName);
   ros::NodeHandle n("~");
+  ros::NodeHandle nh;
 
   // read paramaters
   std::string uri;
@@ -16,6 +17,8 @@ int main(int argc, char **argv)
   bool enable_parameters;
   bool use_ros_time;
   bool enable_logging_imu;
+  bool enable_logging_kalman;
+  bool enable_logging_quaternion;
   bool enable_logging_temperature;
   bool enable_logging_magnetic_field;
   bool enable_logging_pressure;
@@ -30,6 +33,8 @@ int main(int argc, char **argv)
   n.param("enable_parameters", enable_parameters, true);
   n.param("use_ros_time", use_ros_time, true);
   n.param("enable_logging_imu", enable_logging_imu, true);
+  n.param("enable_logging_kalman", enable_logging_kalman, true);
+  n.param("enable_logging_quaternion", enable_logging_quaternion, true);
   n.param("enable_logging_temperature", enable_logging_temperature, true);
   n.param("enable_logging_magnetic_field", enable_logging_magnetic_field, true);
   n.param("enable_logging_pressure", enable_logging_pressure, true);
@@ -38,7 +43,7 @@ int main(int argc, char **argv)
 
 
   ROS_INFO("wait_for_service /add_crazyflie");
-  ros::ServiceClient addCrazyflieService = n.serviceClient<crazyflie_driver::AddCrazyflie>("/add_crazyflie");
+  ros::ServiceClient addCrazyflieService = nh.serviceClient<crazyflie_driver::AddCrazyflie>("add_crazyflie");
   addCrazyflieService.waitForExistence();
   ROS_INFO("found /add_crazyflie");
   crazyflie_driver::AddCrazyflie addCrazyflie;

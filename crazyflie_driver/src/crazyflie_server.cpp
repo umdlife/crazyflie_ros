@@ -91,6 +91,8 @@ public:
     std::vector<crazyflie_driver::LogBlock>& log_blocks,
     bool use_ros_time,
     bool enable_logging_imu,
+    bool enable_logging_kalman,
+    bool enable_logging_quaternion,
     bool enable_logging_temperature,
     bool enable_logging_magnetic_field,
     bool enable_logging_pressure,
@@ -106,6 +108,8 @@ public:
     , m_logBlocks(log_blocks)
     , m_use_ros_time(use_ros_time)
     , m_enable_logging_imu(enable_logging_imu)
+    , m_enable_logging_kalman(enable_logging_kalman)
+    , m_enable_logging_quaternion(enable_logging_quaternion)
     , m_enable_logging_temperature(enable_logging_temperature)
     , m_enable_logging_magnetic_field(enable_logging_magnetic_field)
     , m_enable_logging_pressure(enable_logging_pressure)
@@ -167,6 +171,8 @@ public:
   }
 
 private:
+  sensor_msgs::Imu imu_msg;
+
   struct logImu {
     float acc_x;
     float acc_y;
@@ -183,6 +189,22 @@ private:
     float baro_temp;
     float baro_pressure;
     float pm_vbat;
+  } __attribute__((packed));
+
+  struct logQuaternion {
+    float q0;
+    float q1;
+    float q2;
+    float q3;
+  } __attribute__((packed));
+
+  struct logKalman {
+    float x;
+    float y;
+    float z;
+    float var_x;
+    float var_y;
+    float var_z;
   } __attribute__((packed));
 
 private:
@@ -444,7 +466,45 @@ void cmdPositionSetpoint(
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;
     std::unique_ptr<LogBlock<log2> > logBlock2;
+    std::unique_ptr<LogBlock<logQuaternion> > logBlockQuaternion;
+    std::unique_ptr<LogBlock<logKalman> > logBlockKalman;
     std::vector<std::unique_ptr<LogBlockGeneric> > logBlocksGeneric(m_logBlocks.size());
+
+
+    if(m_enable_logging_kalman) {
+      std::function<void(uint32_t, logKalman*)> cb = std::bind(&CrazyflieROS::onKalmanData, this, std::placeholders::_1, std::placeholders::_2);
+
+      logBlockKalman.reset(new LogBlock<logKalman>(
+        &m_cf,{
+          {"kalman", "stateX"},
+          {"kalman", "stateY"},
+          {"kalman", "stateZ"},
+          {"kalman", "varX"},
+          {"kalman", "varY"},
+          {"kalman", "varZ"},
+        }, cb));
+      logBlockKalman->start(1); // 10ms
+    }
+
+    if(m_enable_logging_quaternion) {
+      std::function<void(uint32_t, logQuaternion*)> cb = std::bind(&CrazyflieROS::onQuaternionData, this, std::placeholders::_1, std::placeholders::_2);
+
+      logBlockQuaternion.reset(new LogBlock<logQuaternion>(
+        &m_cf,{
+          {"kalman", "stateX"},
+          {"kalman", "stateY"},
+          {"kalman", "stateZ"},
+          {"kalman", "varX"},
+          {"kalman", "varY"},
+          {"kalman", "varZ"},
+        }, cb));
+      logBlockKalman->start(1); // 10ms
+    }
+
+    if(m_enable_logging_quaternion) {
+
+    }
+
     if (m_enableLogging) {
 
       std::function<void(const crtpPlatformRSSIAck*)> cb_ack = std::bind(&CrazyflieROS::onEmptyAck, this, std::placeholders::_1);
@@ -467,6 +527,7 @@ void cmdPositionSetpoint(
           }, cb));
         logBlockImu->start(1); // 10ms
       }
+
 
       if (   m_enable_logging_temperature
           || m_enable_logging_magnetic_field
@@ -568,6 +629,24 @@ void cmdPositionSetpoint(
 
       m_pubImu.publish(msg);
     }
+  }
+
+  void onKalmanData(uint32_t time_in_ms, logKalman* data) {
+    // if (m_enable_logging_imu) {
+    //   sensor_msgs::Imu msg;
+    //   if (m_use_ros_time) {
+    //     msg.header.stamp = ros::Time::now();
+    //   } else {
+    //     msg.header.stamp = ros::Time(time_in_ms / 1000.0);
+    //   }
+    //   msg.header.frame_id = "base_link";
+    //   msg.orientation_covariance[0] = -1;
+
+    //   // m_pubImu.publish(msg);
+    // }
+  }
+
+  void onQuaternionData(uint32_t time_in_ms, logQuaternion* data) {
   }
 
   void onLog2Data(uint32_t time_in_ms, log2* data) {
@@ -751,6 +830,8 @@ private:
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   bool m_use_ros_time;
   bool m_enable_logging_imu;
+  bool m_enable_logging_kalman;
+  bool m_enable_logging_quaternion;
   bool m_enable_logging_temperature;
   bool m_enable_logging_magnetic_field;
   bool m_enable_logging_pressure;
@@ -808,13 +889,6 @@ public:
     ros::ServiceServer serviceAdd = n.advertiseService("add_crazyflie", &CrazyflieServer::add_crazyflie, this);
     ros::ServiceServer serviceRemove = n.advertiseService("remove_crazyflie", &CrazyflieServer::remove_crazyflie, this);
 
-    // // High-level API
-    // ros::ServiceServer serviceTakeoff = n.advertiseService("takeoff", &CrazyflieServer::takeoff, this);
-    // ros::ServiceServer serviceLand = n.advertiseService("land", &CrazyflieROS::land, this);
-    // ros::ServiceServer serviceStop = n.advertiseService("stop", &CrazyflieROS::stop, this);
-    // ros::ServiceServer serviceGoTo = n.advertiseService("go_to", &CrazyflieROS::goTo, this);
-    // ros::ServiceServer startTrajectory = n.advertiseService("start_trajectory", &CrazyflieROS::startTrajectory, this);
-
     while(ros::ok()) {
       // Execute any ROS related functions now
       callback_queue.callAvailable(ros::WallDuration(0.0));
@@ -853,6 +927,8 @@ private:
       req.log_blocks,
       req.use_ros_time,
       req.enable_logging_imu,
+      req.enable_logging_kalman,
+      req.enable_logging_quaternion,
       req.enable_logging_temperature,
       req.enable_logging_magnetic_field,
       req.enable_logging_pressure,
@@ -884,53 +960,6 @@ private:
 
     return true;
   }
-
-  // bool takeoff(
-  //   crazyflie_driver::Takeoff::Request& req,
-  //   crazyflie_driver::Takeoff::Response& res)
-  // {
-  //   ROS_INFO("Takeoff requested");
-  //   m_cfbc.takeoff(req.height, req.duration.toSec(), req.groupMask);
-  //   return true;
-  // }
-
-  // bool land(
-  //   crazyflie_driver::Land::Request& req,
-  //   crazyflie_driver::Land::Response& res)
-  // {
-  //   ROS_INFO("Land requested");
-  //   m_cfbc.land(req.height, req.duration.toSec(), req.groupMask);
-  //   return true;
-  // }
-
-  // bool stop(
-  //   crazyflie_driver::Stop::Request& req,
-  //   crazyflie_driver::Stop::Response& res)
-  // {
-  //   ROS_INFO("Stop requested");
-  //   m_cfbc.stop(req.groupMask);
-  //   return true;
-  // }
-
-  // bool goTo(
-  //   crazyflie_driver::GoTo::Request& req,
-  //   crazyflie_driver::GoTo::Response& res)
-  // {
-  //   ROS_INFO("GoTo requested");
-  //   // this is always relative
-  //   m_cfbc.goTo(req.goal.x, req.goal.y, req.goal.z, req.yaw, req.duration.toSec(), req.groupMask);
-  //   return true;
-  // }
-
-  // bool startTrajectory(
-  //   crazyflie_driver::StartTrajectory::Request& req,
-  //   crazyflie_driver::StartTrajectory::Response& res)
-  // {
-  //   ROS_INFO("StartTrajectory requested");
-  //   // this is always relative
-  //   m_cfbc.startTrajectory(req.index, req.numPieces, req.timescale, req.reversed, req.groupMask);
-  //   return true;
-  // }
 
 private:
   std::map<std::string, CrazyflieROS*> m_crazyflies;
