@@ -491,12 +491,10 @@ void cmdPositionSetpoint(
 
       logBlockQuaternion.reset(new LogBlock<logQuaternion>(
         &m_cf,{
-          {"kalman", "stateX"},
-          {"kalman", "stateY"},
-          {"kalman", "stateZ"},
-          {"kalman", "varX"},
-          {"kalman", "varY"},
-          {"kalman", "varZ"},
+          {"kalman", "q0"},
+          {"kalman", "q1"},
+          {"kalman", "q2"},
+          {"kalman", "q3"},
         }, cb));
       logBlockKalman->start(1); // 10ms
     }
