@@ -7,14 +7,29 @@ It has been flattened (remove submodules) and cleaned for custom usage. (removed
 
 Also, many features have been removed as it is running on an embedded computer.
 
+Steps taken:
+
+- Removed the old nodes and unecessary packages
+- Repurposed the tf_prefix, renamed to name and changed its behaviour
+- Allow to disable controls of the crazyflie (this is for a roadrunner which has no motor)
+- Fit the orientation in the ROS IMU message
+- Fit the position (Kalman filtered) into both PoseStamped and PoseWithCovarianceStamped
+
 ## Installation
 
 Clone the package into your catkin workspace:
-```
+
+```bash
 cd Workspace/src
 git clone https://github.com/umdlife/crazyflie_ros
 cd Workspace
 catkin build
+```
+
+## Usage
+
+```bash
+roslaunch crazyflie_ros single_roadrunner.launch
 ```
 
 ## Citing This Work

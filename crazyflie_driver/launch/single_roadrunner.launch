@@ -1,0 +1,27 @@
+<launch>
+  <arg name="uri" default="usb://0" />
+  <arg name="frame" default="base_link" />
+
+  <group ns="crazyflie">
+    <node pkg="crazyflie_driver" type="crazyflie_add" name="crazyflie_add" output="screen">
+      <param name="uri" value="$(arg uri)" />
+      <param name="name" value="middle" />
+      <rosparam>
+        enable_cmd: false
+        enable_parameters: false
+        enable_logging_imu: true
+        enable_logging_kalman: true
+        enable_logging_quaternion: true
+        enable_logging_packets: true
+
+        enable_logging_temperature: false
+        enable_logging_magnetic_field: false
+        enable_logging_pressure: false
+        enable_logging_battery: false
+      </rosparam>
+    </node>
+
+    <node pkg="crazyflie_driver" type="crazyflie_server" name="crazyflie_server" output="screen">
+    </node>
+  </group>
+</launch>
