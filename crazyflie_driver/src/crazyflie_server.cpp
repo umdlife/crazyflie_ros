@@ -85,13 +85,14 @@ class CrazyflieROS
 public:
   CrazyflieROS(
     const std::string& link_uri,
-    const std::string& name,
+    const std::string& _name,
     float roll_trim,
     float pitch_trim,
     bool enable_logging,
     bool enable_parameters,
     std::vector<crazyflie_driver::LogBlock>& log_blocks,
     bool use_ros_time,
+    bool enable_cmd,
     bool enable_logging_imu,
     bool enable_logging_kalman,
     bool enable_logging_quaternion,
@@ -101,7 +102,7 @@ public:
     bool enable_logging_battery,
     bool enable_logging_packets)
     : m_cf(link_uri, rosLogger)
-    , name(name)
+    , name(_name)
     , m_isEmergency(false)
     , m_roll_trim(roll_trim)
     , m_pitch_trim(pitch_trim)
@@ -110,6 +111,7 @@ public:
     , m_logBlocks(log_blocks)
     , m_use_ros_time(use_ros_time)
     , m_enable_logging_imu(enable_logging_imu)
+    , m_enable_cmd(enable_cmd)
     , m_enable_logging_kalman(enable_logging_kalman)
     , m_enable_logging_quaternion(enable_logging_quaternion)
     , m_enable_logging_temperature(enable_logging_temperature)
@@ -159,6 +161,8 @@ public:
     posecovariance_msg.pose.covariance[21] = 2.0;
     posecovariance_msg.pose.covariance[28] = 2.0;
     posecovariance_msg.pose.covariance[35] = 2.0;
+
+    topic_prefix = name.size() == 0 ? name: name + '/';
   }
 
   void stop()
@@ -296,7 +300,7 @@ void cmdPositionSetpoint(
   {
     ROS_INFO("Update parameters");
     for (auto&& p : req.params) {
-      std::string ros_param = "/" + name + "/" + p;
+      std::string ros_param = "/" + topic_prefix + "" + p;
       size_t pos = p.find("/");
       std::string group(p.begin(), p.begin() + pos);
       std::string name(p.begin() + pos + 1, p.end());
@@ -395,53 +399,54 @@ void cmdPositionSetpoint(
     ros::NodeHandle n;
     n.setCallbackQueue(&m_callback_queue);
 
-    m_subscribeCmdVel = n.subscribe(name + "/cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
-    m_subscribeCmdFullState = n.subscribe(name + "/cmd_full_state", 1, &CrazyflieROS::cmdFullStateSetpoint, this);
-    m_subscribeExternalPosition = n.subscribe(name + "/external_position", 1, &CrazyflieROS::positionMeasurementChanged, this);
-    m_serviceEmergency = n.advertiseService(name + "/emergency", &CrazyflieROS::emergency, this);
-    m_subscribeCmdHover = n.subscribe(name + "/cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
-    m_subscribeCmdStop = n.subscribe(name + "/cmd_stop", 1, &CrazyflieROS::cmdStop, this);
-    m_subscribeCmdPosition = n.subscribe(name + "/cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
+    if(m_enable_cmd) {
+      m_subscribeCmdVel = n.subscribe(topic_prefix + "cmd_vel", 1, &CrazyflieROS::cmdVelChanged, this);
+      m_subscribeCmdFullState = n.subscribe(topic_prefix + "cmd_full_state", 1, &CrazyflieROS::cmdFullStateSetpoint, this);
+      m_subscribeExternalPosition = n.subscribe(topic_prefix + "external_position", 1, &CrazyflieROS::positionMeasurementChanged, this);
+      m_serviceEmergency = n.advertiseService(topic_prefix + "emergency", &CrazyflieROS::emergency, this);
+      m_subscribeCmdHover = n.subscribe(topic_prefix + "cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
+      m_subscribeCmdStop = n.subscribe(topic_prefix + "cmd_stop", 1, &CrazyflieROS::cmdStop, this);
+      m_subscribeCmdPosition = n.subscribe(topic_prefix + "cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
 
 
-    m_serviceSetGroupMask = n.advertiseService(name + "/set_group_mask", &CrazyflieROS::setGroupMask, this);
-    m_serviceTakeoff = n.advertiseService(name + "/takeoff", &CrazyflieROS::takeoff, this);
-    m_serviceLand = n.advertiseService(name + "/land", &CrazyflieROS::land, this);
-    m_serviceStop = n.advertiseService(name + "/stop", &CrazyflieROS::stop, this);
-    m_serviceGoTo = n.advertiseService(name + "/go_to", &CrazyflieROS::goTo, this);
-    m_serviceUploadTrajectory = n.advertiseService(name + "/upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
-    m_serviceStartTrajectory = n.advertiseService(name + "/start_trajectory", &CrazyflieROS::startTrajectory, this);
+      m_serviceSetGroupMask = n.advertiseService(topic_prefix + "set_group_mask", &CrazyflieROS::setGroupMask, this);
+      m_serviceTakeoff = n.advertiseService(topic_prefix + "takeoff", &CrazyflieROS::takeoff, this);
+      m_serviceLand = n.advertiseService(topic_prefix + "land", &CrazyflieROS::land, this);
+      m_serviceStop = n.advertiseService(topic_prefix + "stop", &CrazyflieROS::stop, this);
+      m_serviceGoTo = n.advertiseService(topic_prefix + "go_to", &CrazyflieROS::goTo, this);
+      m_serviceUploadTrajectory = n.advertiseService(topic_prefix + "upload_trajectory", &CrazyflieROS::uploadTrajectory, this);
+      m_serviceStartTrajectory = n.advertiseService(topic_prefix + "start_trajectory", &CrazyflieROS::startTrajectory, this);
+    }
 
-
-    m_pubPose = n.advertise<geometry_msgs::PoseStamped>(name + "/pose", 10);
-    m_pubPoseCov = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(name + "/pose_cov", 10);
+    m_pubPose = n.advertise<geometry_msgs::PoseStamped>(topic_prefix + "pose", 10);
+    m_pubPoseCov = n.advertise<geometry_msgs::PoseWithCovarianceStamped>(topic_prefix + "pose_cov", 10);
     
     if (m_enable_logging_imu) {
-      m_pubImu = n.advertise<sensor_msgs::Imu>(name + "/imu", 10);
+      m_pubImu = n.advertise<sensor_msgs::Imu>(topic_prefix + "imu", 10);
     }
     if (m_enable_logging_temperature) {
-      m_pubTemp = n.advertise<sensor_msgs::Temperature>(name + "/temperature", 10);
+      m_pubTemp = n.advertise<sensor_msgs::Temperature>(topic_prefix + "temperature", 10);
     }
     if (m_enable_logging_magnetic_field) {
-      m_pubMag = n.advertise<sensor_msgs::MagneticField>(name + "/magnetic_field", 10);
+      m_pubMag = n.advertise<sensor_msgs::MagneticField>(topic_prefix + "magnetic_field", 10);
     }
     if (m_enable_logging_pressure) {
-      m_pubPressure = n.advertise<std_msgs::Float32>(name + "/pressure", 10);
+      m_pubPressure = n.advertise<std_msgs::Float32>(topic_prefix + "pressure", 10);
     }
     if (m_enable_logging_battery) {
-      m_pubBattery = n.advertise<std_msgs::Float32>(name + "/battery", 10);
+      m_pubBattery = n.advertise<std_msgs::Float32>(topic_prefix + "battery", 10);
     }
     if (m_enable_logging_packets) {
-      m_pubPackets = n.advertise<crazyflie_driver::crtpPacket>(name + "/packets", 10);
+      m_pubPackets = n.advertise<crazyflie_driver::crtpPacket>(topic_prefix + "packets", 10);
     }
-    m_pubRssi = n.advertise<std_msgs::Float32>(name + "/rssi", 10);
+    m_pubRssi = n.advertise<std_msgs::Float32>(topic_prefix + "rssi", 10);
 
     for (auto& logBlock : m_logBlocks)
     {
-      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(name + "/" + logBlock.topic_name, 10));
+      m_pubLogDataGeneric.push_back(n.advertise<crazyflie_driver::GenericLogData>(topic_prefix + "" + logBlock.topic_name, 10));
     }
 
-    m_sendPacketServer = n.advertiseService(name + "/send_packet"  , &CrazyflieROS::sendPacket, this);
+    m_sendPacketServer = n.advertiseService(topic_prefix + "send_packet"  , &CrazyflieROS::sendPacket, this);
 
     // m_cf.reboot();
 
@@ -464,7 +469,7 @@ void cmdPositionSetpoint(
       m_cf.requestParamToc();
       for (auto iter = m_cf.paramsBegin(); iter != m_cf.paramsEnd(); ++iter) {
         auto entry = *iter;
-        std::string paramName = "/" + name + "/" + entry.group + "/" + entry.name;
+        std::string paramName = "/" + topic_prefix + "" + entry.group + "/" + entry.name;
         switch (entry.type) {
           case Crazyflie::ParamTypeUint8:
             ros::param::set(paramName, m_cf.getParam<uint8_t>(entry.id));
@@ -489,7 +494,7 @@ void cmdPositionSetpoint(
             break;
         }
       }
-      m_serviceUpdateParams = n.advertiseService(name + "/update_params", &CrazyflieROS::updateParams, this);
+      m_serviceUpdateParams = n.advertiseService(topic_prefix + "update_params", &CrazyflieROS::updateParams, this);
     }
 
     std::unique_ptr<LogBlock<logImu> > logBlockImu;
@@ -635,26 +640,21 @@ void cmdPositionSetpoint(
 
   void onImuData(uint32_t time_in_ms, logImu* data) {
     if (m_enable_logging_imu) {
-      sensor_msgs::Imu msg;
-      if (m_use_ros_time) {
-        msg.header.stamp = ros::Time::now();
-      } else {
-        msg.header.stamp = ros::Time(time_in_ms / 1000.0);
-      }
-      msg.header.frame_id = "base_link";
-      msg.orientation_covariance[0] = -1;
+      imu_msg.header.stamp = ros::Time::now();
+      imu_msg.header.frame_id = "base_link";
+      imu_msg.orientation_covariance[0] = -1;
 
       // measured in deg/s; need to convert to rad/s
-      msg.angular_velocity.x = degToRad(data->gyro_x);
-      msg.angular_velocity.y = degToRad(data->gyro_y);
-      msg.angular_velocity.z = degToRad(data->gyro_z);
+      imu_msg.angular_velocity.x = degToRad(data->gyro_x);
+      imu_msg.angular_velocity.y = degToRad(data->gyro_y);
+      imu_msg.angular_velocity.z = degToRad(data->gyro_z);
 
       // measured in mG; need to convert to m/s^2
-      msg.linear_acceleration.x = data->acc_x * 9.81;
-      msg.linear_acceleration.y = data->acc_y * 9.81;
-      msg.linear_acceleration.z = data->acc_z * 9.81;
+      imu_msg.linear_acceleration.x = data->acc_x * 9.81;
+      imu_msg.linear_acceleration.y = data->acc_y * 9.81;
+      imu_msg.linear_acceleration.z = data->acc_z * 9.81;
 
-      m_pubImu.publish(msg);
+      m_pubImu.publish(imu_msg);
     }
   }
 
@@ -878,6 +878,7 @@ void cmdPositionSetpoint(
 private:
   Crazyflie m_cf;
   std::string name;
+  std::string topic_prefix;
   bool m_isEmergency;
   float m_roll_trim;
   float m_pitch_trim;
@@ -885,6 +886,7 @@ private:
   bool m_enableParameters;
   std::vector<crazyflie_driver::LogBlock> m_logBlocks;
   bool m_use_ros_time;
+  bool m_enable_cmd;
   bool m_enable_logging_imu;
   bool m_enable_logging_kalman;
   bool m_enable_logging_quaternion;
@@ -984,6 +986,7 @@ private:
       req.enable_parameters,
       req.log_blocks,
       req.use_ros_time,
+      req.enable_cmd,
       req.enable_logging_imu,
       req.enable_logging_kalman,
       req.enable_logging_quaternion,

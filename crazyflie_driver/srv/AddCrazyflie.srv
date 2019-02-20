@@ -6,6 +6,7 @@ bool enable_logging
 bool enable_parameters
 LogBlock[] log_blocks
 bool use_ros_time
+bool enable_cmd
 bool enable_logging_imu
 bool enable_logging_kalman
 bool enable_logging_quaternion

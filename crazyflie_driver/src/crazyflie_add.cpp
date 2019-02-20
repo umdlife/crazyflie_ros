@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   bool enable_logging;
   bool enable_parameters;
   bool use_ros_time;
+  bool enable_cmd;
   bool enable_logging_imu;
   bool enable_logging_kalman;
   bool enable_logging_quaternion;
@@ -32,6 +33,7 @@ int main(int argc, char **argv)
   n.param("enable_logging", enable_logging, true);
   n.param("enable_parameters", enable_parameters, true);
   n.param("use_ros_time", use_ros_time, true);
+  n.param("enable_cmd", enable_cmd, true);
   n.param("enable_logging_imu", enable_logging_imu, true);
   n.param("enable_logging_kalman", enable_logging_kalman, true);
   n.param("enable_logging_quaternion", enable_logging_quaternion, true);
@@ -54,7 +56,10 @@ int main(int argc, char **argv)
   addCrazyflie.request.enable_logging = enable_logging;
   addCrazyflie.request.enable_parameters = enable_parameters;
   addCrazyflie.request.use_ros_time = use_ros_time;
+  addCrazyflie.request.enable_cmd = enable_cmd;
   addCrazyflie.request.enable_logging_imu = enable_logging_imu;
+  addCrazyflie.request.enable_logging_kalman = enable_logging_kalman;
+  addCrazyflie.request.enable_logging_quaternion = enable_logging_quaternion;
   addCrazyflie.request.enable_logging_temperature = enable_logging_temperature;
   addCrazyflie.request.enable_logging_magnetic_field = enable_logging_magnetic_field;
   addCrazyflie.request.enable_logging_pressure = enable_logging_pressure;
