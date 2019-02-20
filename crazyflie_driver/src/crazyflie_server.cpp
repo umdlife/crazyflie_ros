@@ -1,5 +1,7 @@
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
+#include <xmlrpcpp/XmlRpcException.h>
+#include <xmlrpcpp/XmlRpc.h>
 
 #include "crazyflie_driver/AddCrazyflie.h"
 #include "crazyflie_driver/GoTo.h"
@@ -198,6 +200,7 @@ private:
   geometry_msgs::PoseStamped posestamped_msg;
   geometry_msgs::PoseWithCovarianceStamped posecovariance_msg;
   sensor_msgs::MagneticField magneticfield_msg;
+  ros::NodeHandle n;
 
   struct logImu {
     float acc_x;
@@ -253,7 +256,7 @@ private:
       m_cf.setParam<T>(id, (T)value);
   }
 
-void cmdHoverSetpoint(
+  void cmdHoverSetpoint(
     const crazyflie_driver::Hover::ConstPtr& msg)
   {
      //ROS_INFO("got a hover setpoint");
@@ -269,7 +272,7 @@ void cmdHoverSetpoint(
     }
   }
 
-void cmdStop(
+  void cmdStop(
     const std_msgs::Empty::ConstPtr& msg)
   {
      //ROS_INFO("got a stop setpoint");
@@ -280,7 +283,7 @@ void cmdStop(
     }
   }
 
-void cmdPositionSetpoint(
+  void cmdPositionSetpoint(
     const crazyflie_driver::Position::ConstPtr& msg)
   {
     if(!m_isEmergency) {
@@ -396,7 +399,6 @@ void cmdPositionSetpoint(
 
   void run()
   {
-    ros::NodeHandle n;
     n.setCallbackQueue(&m_callback_queue);
 
     if(m_enable_cmd) {
@@ -407,7 +409,6 @@ void cmdPositionSetpoint(
       m_subscribeCmdHover = n.subscribe(topic_prefix + "cmd_hover", 1, &CrazyflieROS::cmdHoverSetpoint, this);
       m_subscribeCmdStop = n.subscribe(topic_prefix + "cmd_stop", 1, &CrazyflieROS::cmdStop, this);
       m_subscribeCmdPosition = n.subscribe(topic_prefix + "cmd_position", 1, &CrazyflieROS::cmdPositionSetpoint, this);
-
 
       m_serviceSetGroupMask = n.advertiseService(topic_prefix + "set_group_mask", &CrazyflieROS::setGroupMask, this);
       m_serviceTakeoff = n.advertiseService(topic_prefix + "takeoff", &CrazyflieROS::takeoff, this);
@@ -675,7 +676,6 @@ void cmdPositionSetpoint(
   }
 
   void onQuaternionData(uint32_t time_in_ms, logQuaternion* data) {
-    // ROS_WARN_STREAM("Quat(" << data->q0 << ", " << data->q1 << ", " << data->q2 << ", " << data->q3 << ")");
     double q3 = sqrt(data->q0*data->q0 + data->q1*data->q1 + data->q2*data->q2);
     imu_msg.header.stamp = ros::Time::now();
     imu_msg.orientation.x = data->q0;
