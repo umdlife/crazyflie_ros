@@ -88,6 +88,8 @@ public:
   CrazyflieROS(
     const std::string& link_uri,
     const std::string& _name,
+    const std::string& imu_frame,
+    const std::string& pose_frame,
     float roll_trim,
     float pitch_trim,
     bool enable_logging,
@@ -105,6 +107,8 @@ public:
     bool enable_logging_packets)
     : m_cf(link_uri, rosLogger)
     , name(_name)
+    , m_imu_frame(imu_frame)
+    , m_pose_frame(pose_frame)
     , m_isEmergency(false)
     , m_roll_trim(roll_trim)
     , m_pitch_trim(pitch_trim)
@@ -149,13 +153,19 @@ public:
   {
     m_thread = std::thread(&CrazyflieROS::run, this);
     imu_msg.header.stamp = ros::Time::now();
-    imu_msg.header.frame_id = name;
+    imu_msg.header.frame_id = m_imu_frame;
+    imu_msg.angular_velocity_covariance[0] = 0.1;
+    imu_msg.angular_velocity_covariance[4] = 0.1;
+    imu_msg.angular_velocity_covariance[8] = 0.1;
+    imu_msg.linear_acceleration_covariance[0] = 0.5;
+    imu_msg.linear_acceleration_covariance[4] = 0.5;
+    imu_msg.linear_acceleration_covariance[8] = 1.0;
     posestamped_msg.header.stamp = ros::Time::now();
-    posestamped_msg.header.frame_id = name;
+    posestamped_msg.header.frame_id = m_pose_frame;
     posecovariance_msg.header.stamp = ros::Time::now();
-    posecovariance_msg.header.frame_id = name;
+    posecovariance_msg.header.frame_id = m_pose_frame;
     magneticfield_msg.header.stamp = ros::Time::now();
-    magneticfield_msg.header.frame_id = name;
+    magneticfield_msg.header.frame_id = m_imu_frame;
 
     posecovariance_msg.pose.covariance[0] = 15.0;
     posecovariance_msg.pose.covariance[7] = 15.0;
@@ -224,8 +234,8 @@ private:
     float q0;
     float q1;
     float q2;
+    float q3;
     float var_q0;
-    float var_q1;
     float var_q2;
   } __attribute__((packed));
 
@@ -538,8 +548,8 @@ private:
             {"kalman", "q0"},
             {"kalman", "q1"},
             {"kalman", "q2"},
+            {"kalman", "q3"},
             {"kalman", "varD0"},
-            {"kalman", "varD1"},
             {"kalman", "varD2"},
           }, cb));
         logBlockQuaternion->start(1); // 10ms
@@ -642,8 +652,6 @@ private:
   void onImuData(uint32_t time_in_ms, logImu* data) {
     if (m_enable_logging_imu) {
       imu_msg.header.stamp = ros::Time::now();
-      imu_msg.header.frame_id = "base_link";
-      imu_msg.orientation_covariance[0] = -1;
 
       // measured in deg/s; need to convert to rad/s
       imu_msg.angular_velocity.x = degToRad(data->gyro_x);
@@ -676,28 +684,31 @@ private:
   }
 
   void onQuaternionData(uint32_t time_in_ms, logQuaternion* data) {
-    double q3 = sqrt(data->q0*data->q0 + data->q1*data->q1 + data->q2*data->q2);
     imu_msg.header.stamp = ros::Time::now();
-    imu_msg.orientation.x = data->q0;
-    imu_msg.orientation.y = data->q1;
-    imu_msg.orientation.z = data->q2;
-    imu_msg.orientation.w = q3;
+    imu_msg.orientation.w = data->q0;
+    imu_msg.orientation.x = data->q1;
+    imu_msg.orientation.y = data->q2;
+    imu_msg.orientation.z = data->q3;
+    imu_msg.orientation_covariance[0] = data->var_q0;
+    imu_msg.orientation_covariance[4] = data->var_q0;
+    imu_msg.orientation_covariance[8] = data->var_q2;
+
 
     posecovariance_msg.header.stamp = ros::Time::now();
     posecovariance_msg.pose.pose.orientation.x = data->q0;
     posecovariance_msg.pose.pose.orientation.y = data->q1;
     posecovariance_msg.pose.pose.orientation.z = data->q2;
-    posecovariance_msg.pose.pose.orientation.w = q3;
+    posecovariance_msg.pose.pose.orientation.w = data->q3;
 
     posecovariance_msg.pose.covariance[21] = data->var_q0;
-    posecovariance_msg.pose.covariance[28] = data->var_q1;
+    posecovariance_msg.pose.covariance[28] = data->var_q0;
     posecovariance_msg.pose.covariance[35] = data->var_q2;
 
     posestamped_msg.header.stamp = ros::Time::now();
     posestamped_msg.pose.orientation.x = data->q0;
     posestamped_msg.pose.orientation.y = data->q1;
     posestamped_msg.pose.orientation.z = data->q2;
-    posestamped_msg.pose.orientation.w = q3;
+    posestamped_msg.pose.orientation.w = data->q3;
   }
 
   void onLogExtraSensorsData(uint32_t time_in_ms, logExtraSensors* data) {
@@ -879,6 +890,8 @@ private:
   Crazyflie m_cf;
   std::string name;
   std::string topic_prefix;
+  std::string m_imu_frame;
+  std::string m_pose_frame;
   bool m_isEmergency;
   float m_roll_trim;
   float m_pitch_trim;
@@ -980,6 +993,8 @@ private:
     CrazyflieROS* cf = new CrazyflieROS(
       req.uri,
       req.name,
+      req.imu_frame,
+      req.pose_frame,
       req.roll_trim,
       req.pitch_trim,
       req.enable_logging,

@@ -7,6 +7,8 @@
       <param name="uri" value="$(arg uri)" />
       <param name="name" value="middle" />
       <rosparam>
+        imu_frame: base_link
+        pose_frame: map
         enable_cmd: false
         enable_parameters: false
         enable_logging_imu: true

@@ -11,6 +11,8 @@ int main(int argc, char **argv)
   // read paramaters
   std::string uri;
   std::string name;
+  std::string imu_frame("base_link");
+  std::string pose_frame("map");
   double roll_trim;
   double pitch_trim;
   bool enable_logging;
@@ -28,6 +30,8 @@ int main(int argc, char **argv)
 
   n.getParam("uri", uri);
   n.getParam("name", name);
+  n.param("imu_frame", imu_frame, imu_frame);
+  n.param("pose_frame", pose_frame, pose_frame);
   n.param("roll_trim", roll_trim, 0.0);
   n.param("pitch_trim", pitch_trim, 0.0);
   n.param("enable_logging", enable_logging, true);
@@ -51,6 +55,8 @@ int main(int argc, char **argv)
   crazyflie_driver::AddCrazyflie addCrazyflie;
   addCrazyflie.request.uri = uri;
   addCrazyflie.request.name = name;
+  addCrazyflie.request.imu_frame = imu_frame;
+  addCrazyflie.request.pose_frame = pose_frame;
   addCrazyflie.request.roll_trim = roll_trim;
   addCrazyflie.request.pitch_trim = pitch_trim;
   addCrazyflie.request.enable_logging = enable_logging;
