@@ -675,9 +675,9 @@ private:
     posecovariance_msg.pose.pose.position.x = data->x;
     posecovariance_msg.pose.pose.position.y = data->y;
     posecovariance_msg.pose.pose.position.z = data->z;
-    posecovariance_msg.pose.covariance[0] = data->var_x * 100;
-    posecovariance_msg.pose.covariance[7] = data->var_y * 100;
-    posecovariance_msg.pose.covariance[14] = data->var_z * 100;
+    posecovariance_msg.pose.covariance[0] = data->var_x * 125;
+    posecovariance_msg.pose.covariance[7] = data->var_y * 125;
+    posecovariance_msg.pose.covariance[14] = data->var_z * 125;
 
     m_pubPose.publish(posestamped_msg);
     m_pubPoseCov.publish(posecovariance_msg);
@@ -689,9 +689,13 @@ private:
     imu_msg.orientation.x = data->q1;
     imu_msg.orientation.y = data->q2;
     imu_msg.orientation.z = data->q3;
-    imu_msg.orientation_covariance[0] = data->var_q0;
-    imu_msg.orientation_covariance[4] = data->var_q0;
-    imu_msg.orientation_covariance[8] = data->var_q2;
+    imu_msg.orientation_covariance[0] = 0.034; // 2 degrees
+    imu_msg.orientation_covariance[4] = 0.034;
+    imu_msg.orientation_covariance[8] = 0.034;
+    // Covariance is invalid
+    // imu_msg.orientation_covariance[0] = data->var_q0;
+    // imu_msg.orientation_covariance[4] = data->var_q0;
+    // imu_msg.orientation_covariance[8] = data->var_q2;
 
 
     posecovariance_msg.header.stamp = ros::Time::now();
@@ -699,10 +703,13 @@ private:
     posecovariance_msg.pose.pose.orientation.x = data->q1;
     posecovariance_msg.pose.pose.orientation.y = data->q2;
     posecovariance_msg.pose.pose.orientation.z = data->q3;
-
-    posecovariance_msg.pose.covariance[21] = data->var_q0;
-    posecovariance_msg.pose.covariance[28] = data->var_q0;
-    posecovariance_msg.pose.covariance[35] = data->var_q2;
+    posecovariance_msg.pose.covariance[21] = 0.034;
+    posecovariance_msg.pose.covariance[28] = 0.034;
+    posecovariance_msg.pose.covariance[35] = 0.034;
+    // Covariance is invalid
+    // posecovariance_msg.pose.covariance[21] = data->var_q0;
+    // posecovariance_msg.pose.covariance[28] = data->var_q0;
+    // posecovariance_msg.pose.covariance[35] = data->var_q2;
 
     posestamped_msg.header.stamp = ros::Time::now();
     posestamped_msg.pose.orientation.w = data->q0;
