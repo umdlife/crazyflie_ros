@@ -675,9 +675,9 @@ private:
     posecovariance_msg.pose.pose.position.x = data->x;
     posecovariance_msg.pose.pose.position.y = data->y;
     posecovariance_msg.pose.pose.position.z = data->z;
-    posecovariance_msg.pose.covariance[0] = data->var_x;
-    posecovariance_msg.pose.covariance[7] = data->var_y;
-    posecovariance_msg.pose.covariance[14] = data->var_z;
+    posecovariance_msg.pose.covariance[0] = data->var_x * 100;
+    posecovariance_msg.pose.covariance[7] = data->var_y * 100;
+    posecovariance_msg.pose.covariance[14] = data->var_z * 100;
 
     m_pubPose.publish(posestamped_msg);
     m_pubPoseCov.publish(posecovariance_msg);
