@@ -8,6 +8,7 @@
 #include "Crazyradio.h"
 #include "CrazyflieUSB.h"
 
+#include <iostream>
 #include <fstream>
 #include <cstring>
 #include <stdexcept>
@@ -1016,7 +1017,12 @@ void Crazyflie::sendPacket(
 
   } else {
     std::unique_lock<std::mutex> mlock(g_crazyflieusbMutex[m_devId]);
-    m_transport->sendPacket(data, length, ack);
+    try {
+      m_transport->sendPacket(data, length, ack);
+    } catch (...) {
+      std::cout << "A CRASH HAS BEEN CATCHED";
+      m_transport->reset_link();
+    }
   }
   ack.data[ack.size] = 0;
   if (ack.ack) {

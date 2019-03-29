@@ -22,6 +22,7 @@ public:
   std::string serial();
 
   float version() const;
+  void reset_link();
 
   virtual void sendPacket(
     const uint8_t* data,
@@ -34,5 +35,6 @@ public:
 
 private:
   void setCrtpToUsb(bool crtpToUsb);
+  uint32_t m_devid;
 
 };

@@ -9,13 +9,28 @@ CrazyflieUSB::CrazyflieUSB(uint32_t devid)
     : ITransport()
     , USBDevice(0x0483, 0x5740)
 {
+    m_devid = devid;
     open(devid);
     setCrtpToUsb(true);
+    had_reset = false;
 }
 
 CrazyflieUSB::~CrazyflieUSB()
 {
     setCrtpToUsb(false);
+}
+
+void CrazyflieUSB::reset_link() {
+    // Stop the libusb device
+    if (m_handle) {
+        libusb_release_interface(m_handle, 0);
+        libusb_close(m_handle);
+    }
+    libusb_exit(m_ctx);
+
+    // Reopen the libusb device
+    open(m_devid);
+    had_reset = true;
 }
 
 uint32_t CrazyflieUSB::numDevices()
@@ -80,19 +95,6 @@ void CrazyflieUSB::sendPacket(
         result.ack = true;
         result.size = transferred;
     }
-
-    // std::cout << "sendPacket: ";
-    // for (uint32_t i = 0; i < length; ++i) {
-    //     std::cout << std::hex << (int)data[i] << " ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << " ack: " << (int)result.ack << " " << (int)result.size << " ";
-    // for (uint32_t i = 0; i < result.size; ++i) {
-    //     std::cout << std::hex << (int)result.data[i] << " ";
-    // }
-    // std::cout << std::endl;
-
-
 }
 
 void CrazyflieUSB::sendPacketNoAck(

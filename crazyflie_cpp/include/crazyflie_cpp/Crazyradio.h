@@ -78,6 +78,8 @@ public:
         return m_ackEnable;
     }
 
+    void reset_link() {};
+
     void setContCarrier(
         bool active);
 

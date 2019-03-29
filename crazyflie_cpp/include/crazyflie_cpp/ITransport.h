@@ -23,6 +23,10 @@ public:
 public:
   virtual ~ITransport() {}
 
+  bool had_reset = false;
+
+  virtual void reset_link() = 0;
+
   virtual void sendPacket(
     const uint8_t* data,
     uint32_t length,
