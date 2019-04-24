@@ -966,6 +966,11 @@ public:
     ros::CallbackQueue callback_queue;
     n.setCallbackQueue(&callback_queue);
 
+    XmlRpc::XmlRpcValue xml_description;
+    ros::NodeHandle pnh("~");
+    pnh.getParam("links", xml_description);
+    parse_yaml(xml_description);
+
     ros::ServiceServer serviceAdd = n.advertiseService("add_crazyflie", &CrazyflieServer::add_crazyflie, this);
     ros::ServiceServer serviceRemove = n.advertiseService("remove_crazyflie", &CrazyflieServer::remove_crazyflie, this);
 
@@ -977,6 +982,109 @@ public:
   }
 
 private:
+
+  void parse_yaml(XmlRpc::XmlRpcValue & xml_description) {
+    if(xml_description.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+      ROS_WARN("crazyflie_server_param.cpp: No roadrunner defined in parameter server.");
+      return;
+    }
+
+    for (int i = 0;  i < xml_description.size(); i++) {
+      XmlRpc::XmlRpcValue link = xml_description[i];
+
+      std::string uri; // Mandatory
+      if(link.hasMember("uri")) {
+        uri = (std::string)link["uri"];
+      } else {
+        ROS_FATAL("crazyflie_server_param.cpp: No uri given in parameter server for one of the links.");
+        continue;
+      }
+
+      std::string name; // Mandatory
+      if(link.hasMember("name")) {
+        name = (std::string)link["name"];
+      } else {
+        ROS_FATAL_STREAM("crazyflie_server_param.cpp: No name given in parameter server for the uri: " << uri);
+        continue;
+      }
+
+      std::string imu_frame("base_link");
+      if(link.hasMember("imu_frame")) imu_frame = (std::string)link["imu_frame"];
+
+      std::string pose_frame("map");
+      if(link.hasMember("pose_frame")) pose_frame = (std::string)link["pose_frame"];
+
+      double roll_trim = 0.0;
+      if(link.hasMember("roll_trim")) roll_trim = (double)link["roll_trim"];
+
+      double pitch_trim = 0.0;
+      if(link.hasMember("pitch_trim")) pitch_trim = (double)link["pitch_trim"];
+
+      bool enable_logging = true;
+      if(link.hasMember("enable_logging")) enable_logging = (bool)link["enable_logging"];
+
+      bool enable_parameters = true;
+      if(link.hasMember("enable_parameters")) enable_parameters = (bool)link["enable_parameters"];
+
+      bool use_ros_time = true;
+      if(link.hasMember("use_ros_time")) use_ros_time = (bool)link["use_ros_time"];
+
+      bool enable_cmd = true;
+      if(link.hasMember("enable_cmd")) enable_cmd = (bool)link["enable_cmd"];
+
+      bool enable_logging_imu = true;
+      if(link.hasMember("enable_logging_imu")) enable_logging_imu = (bool)link["enable_logging_imu"];
+
+      bool enable_logging_kalman = true;
+      if(link.hasMember("enable_logging_kalman")) enable_logging_kalman = (bool)link["enable_logging_kalman"];
+
+      bool enable_logging_quaternion = true;
+      if(link.hasMember("enable_logging_quaternion")) enable_logging_quaternion = (bool)link["enable_logging_quaternion"];
+
+      bool enable_logging_temperature = false;
+      if(link.hasMember("enable_logging_temperature")) enable_logging_temperature = (bool)link["enable_logging_temperature"];
+
+      bool enable_logging_magnetic_field = false;
+      if(link.hasMember("enable_logging_magnetic_field")) enable_logging_magnetic_field = (bool)link["enable_logging_magnetic_field"];
+
+      bool enable_logging_pressure = false;
+      if(link.hasMember("enable_logging_pressure")) enable_logging_pressure = (bool)link["enable_logging_pressure"];
+
+      bool enable_logging_battery = false;
+      if(link.hasMember("enable_logging_battery")) enable_logging_battery = (bool)link["enable_logging_battery"];
+
+      bool enable_logging_packets = true;
+      if(link.hasMember("enable_logging_packets")) enable_logging_packets = (bool)link["enable_logging_packets"];
+
+      std::vector<crazyflie_driver::LogBlock> log_blocks;
+
+      CrazyflieROS* cf = new CrazyflieROS(
+        uri,
+        name,
+        imu_frame,
+        pose_frame,
+        roll_trim,
+        pitch_trim,
+        enable_logging,
+        enable_parameters,
+        log_blocks,
+        use_ros_time,
+        enable_cmd,
+        enable_logging_imu,
+        enable_logging_kalman,
+        enable_logging_quaternion,
+        enable_logging_temperature,
+        enable_logging_magnetic_field,
+        enable_logging_pressure,
+        enable_logging_battery,
+        enable_logging_packets);
+
+      m_crazyflies[uri] = cf;
+
+      ROS_WARN_STREAM('Adding CF in server: ' << name << "@" << uri);
+    }
+
+  }
 
   bool add_crazyflie(
     crazyflie_driver::AddCrazyflie::Request  &req,

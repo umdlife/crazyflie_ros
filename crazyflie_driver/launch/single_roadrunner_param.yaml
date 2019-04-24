@@ -1,0 +1,16 @@
+links: # It is an array with all the roadrunners to be connected to.
+  - uri: usb://0
+    name: middle
+    imu_frame: base_link
+    pose_frame: map
+    enable_cmd: false
+    enable_parameters: false
+    enable_logging_imu: true
+    enable_logging_kalman: true
+    enable_logging_quaternion: true
+    enable_logging_packets: true
+
+    enable_logging_temperature: false
+    enable_logging_magnetic_field: false
+    enable_logging_pressure: false
+    enable_logging_battery: false

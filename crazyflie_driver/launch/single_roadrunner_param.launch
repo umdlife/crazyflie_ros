@@ -1,0 +1,10 @@
+<launch>
+  <arg name="uri" default="usb://0" />
+  <arg name="frame" default="base_link" />
+
+  <group ns="crazyflie">
+    <node respawn="true" respawn_delay="0.1" pkg="crazyflie_driver" type="crazyflie_server" name="crazyflie_server_from_param" output="screen">
+        <rosparam file="$(find crazyflie_driver)/launch/single_roadrunner_param.yaml" command="load"/>
+    </node>
+  </group>
+</launch>
